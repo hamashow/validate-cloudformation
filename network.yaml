@@ -1,0 +1,142 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Simple VPC with Subnet, IGW, and RouteTable (PoC)"
+
+Parameters:
+  CompanyName:
+    Type: String
+    Description: "Company or project name (e.g., example)"
+    Default: "example"
+  ExecutorID:
+    Type: String
+    Description: "000000" # Example of CloudFormation executor ID
+  ExecutorName:
+    Type: String
+    Description: "hamada" # Example of CloudFormation executor name
+  VpcCidr:
+    Type: String
+    Description: "VPC CIDR block (e.g., 10.0.0.0/16)"
+    Default: "10.0.0.0/16"
+    AllowedPattern: "^([0-9]{1,3}\\.){3}[0-9]{1,3}/[0-9]{1,2}$"
+    ConstraintDescription: "Must be a valid CIDR notation (e.g., 10.0.0.0/16)"
+
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: !Ref VpcCidr
+      EnableDnsSupport: true # Enable DNS resolution in VPC
+      EnableDnsHostnames: true # Enable public DNS hostnames
+      Tags:
+        - Key: Name
+          Value: !Sub "${CompanyName}-vpc-poc-${ExecutorName}-${AWS::Region}" # ${AWS::Region}: CloudFormation pseudo parameter for region name
+        - Key: Environment
+          Value: poc
+        - Key: OwnerID
+          Value: !Ref ExecutorID
+        - Key: Purpose
+          Value: "Validate CloudFormation Deployment"
+
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+    Properties:
+      Tags:
+        - Key: Name
+          Value: !Sub "${CompanyName}-igw-poc-${ExecutorName}-${AWS::Region}"
+        - Key: Environment
+          Value: poc
+        - Key: OwnerID
+          Value: !Ref ExecutorID
+        - Key: Purpose
+          Value: "Validate CloudFormation Deployment"
+
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+
+  PublicRouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - "${CompanyName}-public-rtb-poc-external-${ExecutorName}-01-${Az}"
+            - Az: !Select [0, !GetAZs ""]
+        - Key: Environment
+          Value: poc
+        - Key: OwnerID
+          Value: !Ref ExecutorID
+        - Key: Purpose
+          Value: "Validate CloudFormation Deployment"
+
+  PublicRoute:
+    Type: AWS::EC2::Route
+    DependsOn: VPCGatewayAttachment # Create route after attaching IGW to VPC
+    Properties:
+      RouteTableId: !Ref PublicRouteTable
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+
+  PublicSubnet:
+    Type: AWS::EC2::Subnet
+    Properties:
+      VpcId: !Ref VPC
+      CidrBlock: !Select # !Select [ index, list ]
+        - 0 # First item (index starts from 0)
+        - !Cidr # !Cidr [ ipBlock, count, cidrBits ]
+          - !Ref VpcCidr # Reference VPC CIDR
+          - 1 # Number of CIDRs to create
+          - 8 # /16 -> /24 (32 - 8)
+      AvailabilityZone: !Select [0, !GetAZs ""]
+      MapPublicIpOnLaunch: true # Assign public IP on launch
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - "${CompanyName}-public-subnet-poc-external-${ExecutorName}-01-${Az}"
+            - Az: !Select [0, !GetAZs ""]
+        - Key: OwnerID
+          Value: !Ref ExecutorID
+        - Key: Purpose
+          Value: "Validate CloudFormation Deployment"
+
+  PublicNetworkAcl:
+    Type: AWS::EC2::NetworkAcl # Network ACL
+    Properties:
+      VpcId: !Ref VPC
+      Tags:
+        - Key: Name
+          Value: !Sub
+            - "${CompanyName}-public-nacl-poc-external-${ExecutorName}-01-${Az}" # Need to fix!
+            - Az: !Select [0, !GetAZs ""]
+        - Key: Environment
+          Value: poc
+        - Key: OwnerID
+          Value: !Ref ExecutorID
+        - Key: Purpose
+          Value: "Validate CloudFormation Deployment"
+
+  PublicSubnetNetworkAclAssociation:
+    Type: AWS::EC2::SubnetNetworkAclAssociation
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      NetworkAclId: !Ref PublicNetworkAcl
+
+  PublicSubnetRouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation # Associate subnet with route table
+    Properties:
+      SubnetId: !Ref PublicSubnet
+      RouteTableId: !Ref PublicRouteTable
+
+Outputs:
+  VpcId:
+    Description: "VPC ID"
+    Value: !Ref VPC
+    Export:
+      Name: !Sub "${AWS::StackName}-VpcId"
+  PublicSubnetId:
+    Description: "Public Subnet ID"
+    Value: !Ref PublicSubnet
+    Export:
+      Name: !Sub "${AWS::StackName}-PublicSubnetId"

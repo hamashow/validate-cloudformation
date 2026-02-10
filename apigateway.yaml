@@ -1,0 +1,113 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "API Gateway HTTP API with Lambda integration (PoC)"
+
+Parameters:
+  ExecutorID:
+    Type: String
+    Description: "Example of CloudFormation Executor ID"
+  ExecutorName:
+    Type: String
+    Description: "Executor Name (e.g. hamada)"
+
+Resources:
+  # Lambda Function
+  HelloWorldFunction:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: !Sub "yahagi-lambda-poc-${ExecutorName}"
+      Runtime: python3.11
+      Handler: index.handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          def handler(event, context):
+              return {
+                  'statusCode': 200,
+                  'body': 'Hello from Lambda!'
+              }
+      Tags:
+        - Key: Name
+          Value: !Sub "yahagi-lambda-poc-${ExecutorName}"
+        - Key: Environment
+          Value: poc
+        - Key: OwnerID
+          Value: !Ref ExecutorID
+
+  # Lambda Execution Role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+      Tags:
+        - Key: Name
+          Value: !Sub "yahagi-lambda-role-poc-${ExecutorName}"
+        - Key: Environment
+          Value: poc
+
+  # API Gateway HTTP API
+  HttpApi:
+    Type: AWS::ApiGatewayV2::Api
+    Properties:
+      Name: !Sub "yahagi-api-poc-${ExecutorName}"
+      ProtocolType: HTTP
+      Description: "Sample HTTP API for PoC"
+      Tags:
+        Name: !Sub "yahagi-api-poc-${ExecutorName}"
+        Environment: poc
+        OwnerID: !Ref ExecutorID
+
+  # Lambda Integration
+  LambdaIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref HttpApi
+      IntegrationType: AWS_PROXY
+      IntegrationUri: !GetAtt HelloWorldFunction.Arn
+      PayloadFormatVersion: "2.0"
+
+  # Route
+  HelloRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref HttpApi
+      RouteKey: "GET /hello"
+      Target: !Sub "integrations/${LambdaIntegration}"
+
+  # Stage
+  ApiStage:
+    Type: AWS::ApiGatewayV2::Stage
+    Properties:
+      ApiId: !Ref HttpApi
+      StageName: prod
+      AutoDeploy: true
+      Tags:
+        Name: !Sub "yahagi-api-stage-poc-${ExecutorName}"
+        Environment: poc
+
+  # Lambda Permission for API Gateway
+  LambdaInvokePermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref HelloWorldFunction
+      Action: lambda:InvokeFunction
+      Principal: apigateway.amazonaws.com
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${HttpApi}/*/*"
+
+Outputs:
+  ApiEndpoint:
+    Description: "API Gateway endpoint URL"
+    Value: !Sub "https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/prod/hello"
+  ApiId:
+    Description: "API Gateway ID"
+    Value: !Ref HttpApi
+  LambdaFunctionArn:
+    Description: "Lambda Function ARN"
+    Value: !GetAtt HelloWorldFunction.Arn

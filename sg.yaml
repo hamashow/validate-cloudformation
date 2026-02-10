@@ -1,0 +1,52 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: "Security group referencing network stack"
+
+Parameters:
+  CompanyName:
+    Type: String
+    Description: "Company or project name (e.g., example)"
+    Default: "example"
+  NetworkStackName:
+    Type: String
+    Description: "network.yaml Stack Name (exports VpcId)"
+  ExecutorID:
+    Type: String
+    Description: "Example of CloudFormation Executor ID"
+  ExecutorName:
+    Type: String
+    Description: "Executor Name (e.g. hamada)"
+  AllowedCidr:
+    Type: String
+    Description: "Enter your office or home IP CIDR (e.g., 203.0.113.0/24)"
+    Default: "0.0.0.0/0"
+    AllowedPattern: "^([0-9]{1,3}\\.){3}[0-9]{1,3}/[0-9]{1,2}$"
+    ConstraintDescription: "Must be a valid CIDR notation (e.g., 192.168.1.0/24)"
+
+Resources:
+  WebSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: "Sample SG for EC22"
+      VpcId: !ImportValue
+        !Sub "${NetworkStackName}-VpcId"
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 3389
+          ToPort: 3389
+          CidrIp: !Ref AllowedCidr
+      Tags:
+        - Key: Name
+          Value: !Sub "${CompanyName}-public-sg-app-poc-${ExecutorName}-${AWS::Region}"
+        - Key: Environment
+          Value: poc
+        - Key: OwnerID
+          Value: !Ref ExecutorID
+        - Key: Purpose
+          Value: "Validate CloudFormation Deployment"
+
+Outputs:
+  SecurityGroupId:
+    Description: "Security Group ID"
+    Value: !Ref WebSecurityGroup
+    Export:
+      Name: !Sub "${AWS::StackName}-SecurityGroupId"
