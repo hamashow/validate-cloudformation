@@ -50,15 +50,6 @@ Resources:
             VolumeSize: 30
             VolumeType: gp3
             DeleteOnTermination: true  # Auto-delete EBS when EC2 is terminated
-            Tags:
-              - Key: Name
-                Value: !Sub "${CompanyName}-ebs-c-${ExecutorName}-server"
-              - Key: Environment
-                Value: poc
-              - Key: OwnerID
-                Value: !Ref ExecutorID
-              - Key: Purpose
-                Value: "Validate CloudFormation Deployment"
       Tags:
         - Key: Name
           Value: !Sub "${CompanyName}-ec2-poc-${ExecutorName}-server-${AWS::Region}"
