@@ -27,8 +27,7 @@ Resources:
     Type: AWS::EC2::SecurityGroup
     Properties:
       GroupDescription: "Sample SG for EC22"
-      VpcId: !ImportValue
-        !Sub "${NetworkStackName}-VpcId"
+      VpcId: !ImportValue !Sub "${NetworkStackName}-VpcId"
       SecurityGroupIngress:
         - IpProtocol: tcp
           FromPort: 3389
