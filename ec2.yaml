@@ -40,17 +40,16 @@ Resources:
       InstanceType: t2.small
       ImageId: !Sub "{{resolve:ssm:/aws/service/ami-windows-latest/Windows_Server-2022-English-Full-Base}}"
       KeyName: !Ref EC2KeyPair
-      SubnetId: !ImportValue
-        !Sub "${NetworkStackName}-PublicSubnetId"
+      SubnetId:
+        Fn::ImportValue: !Sub "${NetworkStackName}-PublicSubnetId"
       SecurityGroupIds:
-        - !ImportValue
-            !Sub "${SecurityGroupStackName}-SecurityGroupId"
+        - Fn::ImportValue: !Sub "${SecurityGroupStackName}-SecurityGroupId"
       BlockDeviceMappings:
         - DeviceName: /dev/sda1
           Ebs:
             VolumeSize: 30
             VolumeType: gp3
-            DeleteOnTermination: true
+            DeleteOnTermination: true  # Auto-delete EBS when EC2 is terminated
             Tags:
               - Key: Name
                 Value: !Sub "${CompanyName}-ebs-c-${ExecutorName}-server"
